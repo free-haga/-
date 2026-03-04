@@ -2,7 +2,542 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta na<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠計算ツール v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222636;
+    --border: #2e3350;
+    --accent: #4f8eff;
+    --accent2: #ff6b6b;
+    --accent3: #43e097;
+    --accent4: #ffd166;
+    --accent5: #c084fc;
+    --text: #e8eaf6;
+    --text2: #8892b0;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans JP', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(79,142,255,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(67,224,151,0.06) 0%, transparent 50%);
+  }
+
+  .container { max-width: 680px; margin: 0 auto; }
+
+  header { margin-bottom: 24px; }
+  .label-tag { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; opacity: 0.8; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  h1 span { color: var(--accent); }
+
+  .mode-tabs {
+    display: flex; gap: 4px;
+    background: var(--surface2); border-radius: 10px; padding: 4px;
+    margin-bottom: 14px;
+  }
+  .mode-tab {
+    flex: 1; padding: 9px 0; text-align: center;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border-radius: 7px; color: var(--text2);
+    transition: all 0.2s; border: none; background: none;
+    font-family: var(--sans);
+  }
+  .mode-tab.active {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 10px;
+  }
+  .card-title {
+    font-family: var(--mono); font-size: 10px; color: var(--text2);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 14px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+  .mt10 { margin-top: 10px; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--text2); font-weight: 500; letter-spacing: 0.3px; display: flex; align-items: center; gap: 4px; }
+  .field input, .field select {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-family: var(--mono); font-size: 14px;
+    padding: 9px 11px; width: 100%; outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79,142,255,0.1);
+  }
+  .field input::placeholder { color: var(--text2); opacity: 0.35; }
+
+  .weekly-section { display: none; }
+  .weekly-section.visible { display: block; }
+
+  .week-bar { height: 6px; background: var(--border); border-radius: 4px; margin-top: 10px; overflow: hidden; }
+  .week-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; background: linear-gradient(90deg, var(--accent), var(--accent3)); }
+  .week-bar-fill.over { background: linear-gradient(90deg, var(--accent4), var(--accent2)); }
+  .week-summary { font-family: var(--mono); font-size: 11px; color: var(--text2); margin-top: 6px; display: flex; justify-content: space-between; }
+  .week-summary .hi { color: var(--accent4); }
+
+  .hint { font-size: 11px; color: var(--text2); margin-top: 8px; opacity: 0.65; }
+
+  .results { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  .results-header { background: var(--surface2); padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .results-header .left { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .results-header .right { font-size: 11px; color: var(--accent4); font-family: var(--mono); }
+  .results-body { padding: 14px 18px; }
+
+  .result-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(46,51,80,0.5); }
+  .result-row:last-child { border-bottom: none; }
+  .result-label { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+  .result-value { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .result-value.split { display: flex; gap: 10px; align-items: center; }
+  .result-value .bill { color: var(--accent); }
+  .result-value .wage { color: var(--accent3); }
+  .result-value .sep { color: var(--text2); font-size: 11px; }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  .breakdown-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 50px 70px 72px 72px;
+    align-items: center; padding: 6px 8px; border-radius: 7px;
+    gap: 6px; font-size: 12px; transition: background 0.15s;
+  }
+  .breakdown-row:hover { background: var(--surface2); }
+  .breakdown-row.header { font-family: var(--mono); font-size: 9px; color: var(--text2); letter-spacing: 0.5px; }
+  .breakdown-row .icon { font-size: 12px; text-align: center; }
+  .breakdown-row .name { color: var(--text); }
+  .breakdown-row .rate { font-family: var(--mono); color: var(--text2); text-align: right; }
+  .breakdown-row .hrs  { font-family: var(--mono); color: var(--accent); text-align: right; }
+  .breakdown-row .amt-b { font-family: var(--mono); color: var(--accent); text-align: right; font-weight: 500; }
+  .breakdown-row .amt-w { font-family: var(--mono); color: var(--accent3); text-align: right; font-weight: 500; }
+
+  .total-block {
+    background: var(--surface2); border-radius: 10px; padding: 14px;
+    margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .total-item { display: flex; flex-direction: column; gap: 4px; }
+  .total-item .tl { font-size: 11px; color: var(--text2); }
+  .total-item .tv { font-family: var(--mono); font-size: 22px; font-weight: 500; }
+  .total-item.billing .tv { color: var(--accent); }
+  .total-item.wage .tv { color: var(--accent3); }
+
+  .badge { font-family: var(--mono); font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
+  .badge-week { background: rgba(192,132,252,0.15); color: var(--accent5); }
+
+  .error-msg {
+    background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3);
+    color: var(--accent2); font-size: 12px; padding: 10px 14px;
+    border-radius: 8px; margin-top: 8px; display: none;
+  }
+  .night-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 10px;
+    background: rgba(67,224,151,0.1); color: var(--accent3);
+    border: 1px solid rgba(67,224,151,0.2);
+    padding: 2px 7px; border-radius: 20px;
+  }
+
+  @media (max-width: 520px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+    .breakdown-row { grid-template-columns: 0 1fr 44px 62px 62px 62px; }
+    .breakdown-row .icon { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="label-tag">人材派遣</div>
+    <h1>勤怠 <span>計算ツール</span></h1>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="setMode('single')">単日チェック</button>
+    <button class="mode-tab" onclick="setMode('weekly')">週40h超チェック（6日目）</button>
+  </div>
+
+  <!-- 週次：前5日入力 -->
+  <div class="weekly-section" id="weekly-section">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent5)"></span>前5日（月〜金 or 日〜木）の実働時間</div>
+      <div class="grid-4">
+        <div class="field"><label>1日目（h）</label><input type="number" class="prior-day" id="d1" value="8" min="0" max="16" step="0.25"></div>
+        <div class="field"><label>2日目（h）</label><input type="number" class="prior-day" id="d2" value="8" min="0" max="16" step="0.25"></div>
+        <div class="field"><label>3日目（h）</label><input type="number" class="prior-day" id="d3" value="8" min="0" max="16" step="0.25"></div>
+        <div class="field"><label>4日目（h）</label><input type="number" class="prior-day" id="d4" value="8" min="0" max="16" step="0.25"></div>
+      </div>
+      <div class="grid-4 mt10">
+        <div class="field"><label>5日目（h）</label><input type="number" class="prior-day" id="d5" value="8" min="0" max="16" step="0.25"></div>
+      </div>
+      <div class="week-bar"><div class="week-bar-fill" id="week-bar-fill" style="width:100%"></div></div>
+      <div class="week-summary">
+        <span id="week-prior-label">前5日合計: 40.0h</span>
+        <span id="week-remaining-label">残り週枠: <span class="hi">0.0h</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 勤務入力 -->
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--accent)"></span><span id="day-label">当日の勤務入力</span></div>
+    <div class="grid-2">
+      <div class="field">
+        <label>出勤時刻</label>
+        <input type="time" id="start" value="09:00">
+      </div>
+      <div class="field">
+        <label>退勤時刻 <span id="night-indicator"></span></label>
+        <input type="time" id="end" value="18:00">
+      </div>
+    </div>
+    <div class="grid-3 mt10">
+      <div class="field">
+        <label>休憩（分）</label>
+        <input type="number" id="break_min" value="60" min="0" max="480">
+      </div>
+      <div class="field">
+        <label>うち深夜帯の休憩（分）<span title="22:00〜翌5:00の間に取った休憩" style="cursor:help;opacity:0.5;font-size:13px;">ℹ</span></label>
+        <input type="number" id="break_night" value="0" min="0" max="480" placeholder="0">
+      </div>
+      <div class="field">
+        <label>丸め単位（分）</label>
+        <select id="round_unit">
+          <option value="1">1分</option>
+          <option value="5">5分</option>
+          <option value="10">10分</option>
+          <option value="15" selected>15分</option>
+          <option value="30">30分</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint">丸め：請求＝切り捨て（FLOOR）　給与＝切り上げ（CEIL）　固定</div>
+    <div id="error-msg" class="error-msg"></div>
+  </div>
+
+  <!-- 単価 -->
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>単価設定</div>
+    <div class="grid-2">
+      <div class="field"><label>請求単価（円/時）</label><input type="number" id="bill_rate" value="1800" min="0"></div>
+      <div class="field"><label>給与時給（円/時）</label><input type="number" id="wage_rate" value="1200" min="0"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results">
+    <div class="results-header">
+      <div class="left"><span class="dot" style="background:var(--accent3)"></span>計算結果</div>
+      <div class="right" id="shift-type"></div>
+    </div>
+    <div class="results-body">
+
+      <div class="result-row">
+        <span class="result-label">丸め後の時刻</span>
+        <div class="result-value split">
+          <span class="bill" id="r-timespan-b">--</span>
+          <span class="sep">請求</span>
+          <span class="wage" id="r-timespan-w">--</span>
+          <span class="sep">給与</span>
+        </div>
+      </div>
+      <div class="result-row">
+        <span class="result-label">実働時間（請求）</span>
+        <span class="result-value bill" id="r-actual-b">--</span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">実働時間（給与）</span>
+        <span class="result-value wage" id="r-actual-w">--</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="breakdown-row header">
+        <div></div><div>区分</div>
+        <div style="text-align:right">倍率</div>
+        <div style="text-align:right">時間</div>
+        <div style="text-align:right">請求額</div>
+        <div style="text-align:right">給与額</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="icon">🟦</div><div class="name">基本</div>
+        <div class="rate">×1.00</div>
+        <div class="hrs" id="br-normal-h">--</div>
+        <div class="amt-b" id="br-normal-ab">--</div>
+        <div class="amt-w" id="br-normal-aw">--</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="icon">🟥</div><div class="name">残業（8h超 / 週40h超）</div>
+        <div class="rate">×1.25</div>
+        <div class="hrs" id="br-ot-h">--</div>
+        <div class="amt-b" id="br-ot-ab">--</div>
+        <div class="amt-w" id="br-ot-aw">--</div>
+      </div>
+      <div class="breakdown-row" id="row-weekot" style="display:none">
+        <div class="icon">🟪</div>
+        <div class="name" style="font-size:11px;color:var(--text2)">└ うち週40h超分 <span class="badge badge-week">WEEK</span></div>
+        <div class="rate">×1.25</div>
+        <div class="hrs" id="br-weekot-h">--</div>
+        <div class="amt-b" id="br-weekot-ab">--</div>
+        <div class="amt-w" id="br-weekot-aw">--</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="icon">🟩</div><div class="name">深夜（22〜翌5時）</div>
+        <div class="rate">×1.25</div>
+        <div class="hrs" id="br-night-h">--</div>
+        <div class="amt-b" id="br-night-ab">--</div>
+        <div class="amt-w" id="br-night-aw">--</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="icon">🟨</div><div class="name">深夜残業（22〜翌5時 かつ 8h超）</div>
+        <div class="rate">×1.50</div>
+        <div class="hrs" id="br-nightot-h">--</div>
+        <div class="amt-b" id="br-nightot-ab">--</div>
+        <div class="amt-w" id="br-nightot-aw">--</div>
+      </div>
+      
+
+      <div class="total-block">
+        <div class="total-item billing">
+          <div class="tl">請求額合計（切り捨て）</div>
+          <div class="tv" id="total-bill">¥0</div>
+        </div>
+        <div class="total-item wage">
+          <div class="tl">給与額合計（切り上げ）</div>
+          <div class="tv" id="total-wage">¥0</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<script>
+const NIGHT_START = 22 * 60;           // 1320
+const NIGHT_END   = 24 * 60 + 5 * 60; // 1740 (翌5:00)
+
+let currentMode = 'single';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach((t,i) => {
+    t.classList.toggle('active',(mode==="single"&&i===0)||(mode==="weekly"&&i===1));
+  });
+  document.getElementById('weekly-section').classList.toggle('visible', mode==="weekly");
+  document.getElementById('day-label').textContent = mode==="weekly" ? '6日目（土曜 or 金曜）の勤務' : '当日の勤務入力';
+  document.getElementById('row-weekot').style.display = mode==="weekly" ? 'grid' : 'none';
+  calc();
+}
+
+function timeToMin(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function floorTo(v,u){ return Math.floor(v/u)*u; }
+function ceilTo(v,u) { return Math.ceil(v/u)*u; }
+function overlap(a1,a2,b1,b2){ return Math.max(0,Math.min(a2,b2)-Math.max(a1,b1)); }
+
+function minToHM(m){
+  if(m<=0) return '0h 00m';
+  return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
+}
+function minToTime(m){
+  const b=((Math.round(m)%1440)+1440)%1440;
+  return `${String(Math.floor(b/60)).padStart(2,'0')}:${String(b%60).padStart(2,'0')}`;
+}
+function fmtMoney(v){ return '¥'+Math.round(v).toLocaleString('ja-JP'); }
+
+function getPriorHours(){
+  if(currentMode!=='weekly') return 0;
+  return [1,2,3,4,5].reduce((s,i)=>s+(parseFloat(document.getElementById('d'+i).value)||0),0);
+}
+function updateWeekBar(priorH){
+  const pct=Math.min(100,(priorH/40)*100);
+  const fill=document.getElementById('week-bar-fill');
+  fill.style.width=pct+'%';
+  fill.className='week-bar-fill'+(priorH>=40?' over':'');
+  const rem=Math.max(0,40-priorH);
+  document.getElementById('week-prior-label').textContent=`前5日合計: ${priorH.toFixed(2)}h`;
+  document.getElementById('week-remaining-label').innerHTML=`残り週枠: <span class="hi">${rem.toFixed(2)}h</span>`;
+}
+
+// ─── コア計算 ───────────────────────────────────────────
+// ゾーン定義:
+//   basicZone : 0 ~ NIGHT_START (22:00)
+//   nightZone : NIGHT_START ~ NIGHT_END (翌5:00)
+//   otZone    : NIGHT_END ~ ∞
+//
+// 8h枠の消費順: basicMin → nightMin → otZoneRaw
+//   余った分が各ゾーンのOT
+//
+// 4区分:
+//   基本      (×1.00) = basicMin の non-OT部分
+//   深夜      (×1.25) = nightMin の non-OT部分
+//   残業      (×1.25) = basicMin のOT部分 + otZoneRaw のOT部分
+//   深夜残業  (×1.50) = nightMin のOT部分
+function doCalc(roundType, priorH){
+  const startRaw   = document.getElementById('start').value;
+  const endRaw     = document.getElementById('end').value;
+  const breakMin      = parseFloat(document.getElementById('break_min').value)||0;
+  const breakNightMin = parseFloat(document.getElementById('break_night').value)||0;
+  const roundUnit     = parseInt(document.getElementById('round_unit').value);
+
+  let sMin = timeToMin(startRaw);
+  let eMin = timeToMin(endRaw);
+  const isNight = eMin <= sMin;
+  if(isNight) eMin += 1440;
+
+  const applyRound = roundType==='floor' ? floorTo : ceilTo;
+  const sR = applyRound(sMin, roundUnit);
+  const eR = applyRound(eMin, roundUnit);
+
+  // 各ゾーンの生の重複
+  const basicRaw  = overlap(sR, eR, 0,           NIGHT_START);
+  const nightRaw  = overlap(sR, eR, NIGHT_START,  NIGHT_END);
+  const otZoneRaw = overlap(sR, eR, NIGHT_END,    99999*60);
+
+  // 休憩を適用（深夜休憩→深夜ゾーンから、残りは基本ゾーンから）
+  const nightMin      = Math.max(0, nightRaw  - breakNightMin);
+  const nonNightBreak = Math.max(0, breakMin  - breakNightMin);
+  const basicMin      = Math.max(0, basicRaw  - nonNightBreak);
+  const actual        = basicMin + nightMin + otZoneRaw;
+
+  // ── OT・深夜残業の判定（ゾーンC分離方式）──────────────
+  // ルール:
+  //   ZoneC（翌5:00以降）= 常に残業×1.25（時間帯で確定）
+  //   OT閾値（8h／週40h）の判定は ZoneA+B のみで行う
+  //   → excess_AB がZoneB末尾から超えた分 = 深夜残業×1.50
+
+  const weekRemain = currentMode==='weekly' ? Math.max(0,(40-priorH)*60) : Infinity;
+  const budget     = Math.min(weekRemain, 8*60);
+  const totalOT    = Math.max(0, actual - budget);
+
+  // OT充填順: ZoneC → ZoneB(深夜残業) → ZoneA
+  const otInC    = Math.min(otZoneRaw, totalOT);
+  const otBeyondC= totalOT - otInC;
+  const 深夜残業  = Math.min(nightMin, otBeyondC);
+  const 深夜      = nightMin - 深夜残業;
+  const 残業      = totalOT - 深夜残業;
+
+  // 基本 = 実働 - OT全体 - 深夜(非OT) ★ZoneCの非OT分も基本に含む
+  const trueBasic = actual - totalOT - 深夜;
+
+  const dailyOT = Math.max(0, actual - 8*60);
+  const weekOt  = currentMode==='weekly' ? Math.max(0, totalOT - dailyOT) : 0;
+
+  return { sR, eR, actual, trueBasic, weekOt, 深夜, 残業, 深夜残業, isNight };
+}
+
+function calc(){
+  const startRaw = document.getElementById('start').value;
+  const endRaw   = document.getElementById('end').value;
+  if(!startRaw||!endRaw) return;
+
+  const priorH   = getPriorHours();
+  if(currentMode==='weekly') updateWeekBar(priorH);
+
+  const errEl = document.getElementById('error-msg');
+  errEl.style.display = 'none';
+
+  const B = doCalc('floor', priorH);
+  const W = doCalc('ceil',  priorH);
+
+  if(B.actual > 16*60){
+    errEl.textContent = '⚠ 16時間超。夜勤は退勤を出勤より早い時刻で入力してください。';
+    errEl.style.display = 'block';
+  }
+
+  const billRate = parseFloat(document.getElementById('bill_rate').value)||0;
+  const wageRate = parseFloat(document.getElementById('wage_rate').value)||0;
+  const toH = m => m/60;
+
+  set('r-timespan-b', `${minToTime(B.sR)}→${minToTime(B.eR)}`);
+  set('r-timespan-w', `${minToTime(W.sR)}→${minToTime(W.eR)}`);
+  set('r-actual-b', minToHM(B.actual));
+  set('r-actual-w', minToHM(W.actual));
+
+  // 時間列（請求ベース）
+  set('br-normal-h',  minToHM(B.trueBasic));
+  set('br-ot-h',      minToHM(B['残業']));
+  set('br-weekot-h',  minToHM(B.weekOt));
+  set('br-night-h',   minToHM(B['深夜']));
+  set('br-nightot-h', minToHM(B['深夜残業']));
+
+  // 請求額（FLOOR）
+  const bBasic   = toH(B.trueBasic)   * billRate * 1.00;
+  const bOt      = toH(B['残業'])     * billRate * 1.25;
+  const bNight   = toH(B['深夜'])     * billRate * 1.25;
+  const bNightOt = toH(B['深夜残業']) * billRate * 1.50;
+
+  // 給与額（CEIL）
+  const wBasic   = toH(W.trueBasic)   * wageRate * 1.00;
+  const wOt      = toH(W['残業'])     * wageRate * 1.25;
+  const wNight   = toH(W['深夜'])     * wageRate * 1.25;
+  const wNightOt = toH(W['深夜残業']) * wageRate * 1.50;
+
+  set('br-normal-ab',  fmtMoney(bBasic));
+  set('br-ot-ab',      fmtMoney(bOt));
+  set('br-weekot-ab',  '—');
+  set('br-night-ab',   fmtMoney(bNight));
+  set('br-nightot-ab', fmtMoney(bNightOt));
+
+  set('br-normal-aw',  fmtMoney(wBasic));
+  set('br-ot-aw',      fmtMoney(wOt));
+  set('br-weekot-aw',  '—');
+  set('br-night-aw',   fmtMoney(wNight));
+  set('br-nightot-aw', fmtMoney(wNightOt));
+
+  set('total-bill', fmtMoney(bBasic+bOt+bNight+bNightOt));
+  set('total-wage', fmtMoney(wBasic+wOt+wNight+wNightOt));
+
+  document.getElementById('night-indicator').innerHTML = B.isNight ? '<span class="night-badge">🌙 夜勤</span>' : '';
+  const tags=[];
+  if(B.isNight)           tags.push('夜勤');
+  if(B['深夜残業']>0)    tags.push('深夜残業あり');
+  else if(B['残業']>0)   tags.push('残業あり');
+  if(B.weekOt>0)          tags.push('週40h超');
+  document.getElementById('shift-type').textContent = tags.join(' / ');
+}
+
+function set(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; }
+
+['start','end','break_min','break_night','round_unit','bill_rate','wage_rate'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', calc);
+});
+document.querySelectorAll('.prior-day').forEach(el=>el.addEventListener('input',calc));
+calc();
+</script>
+</body>
+</html>
+me="viewport" content="width=device-width, initial-scale=1.0">
 <title>勤怠計算ツール v2</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap');
